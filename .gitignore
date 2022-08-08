@@ -1,0 +1,11 @@
+### IntelliJ ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+cmake-build-debug
+
+### VS ###
+.vs/
+.vscode/
