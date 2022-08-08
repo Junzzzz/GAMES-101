@@ -1,6 +1,6 @@
-#include<cmath>
-#include<Eigen/Core>
-#include<iostream>
+#include <cmath>
+#include <iostream>
+#include <eigen3/Eigen/Core>
 
 using namespace std;
 using namespace Eigen;
@@ -10,7 +10,7 @@ using namespace Eigen;
 int main() {
     double theta = 45.0 / 180.0 * PI;
 
-    Matrix3d rotation, translation;
+    Eigen::Matrix3d rotation, translation;
 
     // 旋转矩阵
     rotation << cos(theta), -sin(theta), 0,
@@ -26,7 +26,7 @@ int main() {
     MatrixXd p(3, 1);
     p << 2.0, 1.0, 1;
 
-    cout << translation * rotation * p << std::endl;
+    cout << translation * rotation * p << endl;
 
     return 0;
 }
