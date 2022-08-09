@@ -30,8 +30,9 @@ Eigen::Matrix4f get_model_matrix(float rotation_angle)
 
     // 绕Z轴旋转
     Eigen::Matrix4f rotation;
-    rotation << std::cos(rad), -std::sin(rad), 0, 0,
-                std::sin(rad), std::cos(rad), 0, 0,
+    float cos = std::cos(rad), sin = std::sin(rad);
+    rotation << cos, -sin, 0, 0,
+                sin, cos, 0, 0,
                 0, 0, 1, 0,
                 0, 0, 0, 1;
 
@@ -71,6 +72,27 @@ Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio,
 
     projection = ortho_scale * ortho_translate * persp2ortho;
     return projection;
+}
+
+Eigen::Matrix4f get_rotation(Eigen::Vector3f axis, float angle)
+{
+    // 得到绕任意过原点的轴的旋转变换矩阵
+    float rad = angle / 180.0 * MY_PI / 2;
+
+    // 轴向量长度
+    float length = std::sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
+
+    float sin = std::sin(rad);
+    float a = std::cos(rad),
+            b = sin * axis[0] / length,
+            c = sin * axis[1] / length,
+            d = sin * axis[2] / length;
+    Eigen::Matrix4f rotation;
+    rotation << 1 - 2 * c * c - 2 * d * d, 2 * b * c - 2 * a * d, 2 * a * c + 2 * b * d, 0,
+                2 * b * c + 2 * a * d, 1 - 2 * b * b - 2 * d * d, 2 * c * d - 2 * a * b, 0,
+                2 * b * d - 2 * a * c, 2 * a * b + 2 * c * d, 1 - 2 * b * b - 2 * c * c, 0,
+                0, 0, 0, 1;
+    return rotation;
 }
 
 int main(int argc, const char** argv)
@@ -120,6 +142,8 @@ int main(int argc, const char** argv)
     while (key != 27) {
         r.clear(rst::Buffers::Color | rst::Buffers::Depth);
 
+        // 相同效果
+//        r.set_model(get_rotation(Eigen::Vector3f(0, 0, 1), angle));
         r.set_model(get_model_matrix(angle));
         r.set_view(get_view_matrix(eye_pos));
         r.set_projection(get_projection_matrix(45, 1, 0.1, 50));
