@@ -36,3 +36,4 @@ endif()
 
 add_subdirectory(Assignment-0)
 add_subdirectory(Assignment-1)
+add_subdirectory(Assignment-2)
