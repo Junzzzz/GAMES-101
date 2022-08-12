@@ -7,8 +7,8 @@
 #include <vector>
 #include "rasterizer.hpp"
 #include <opencv2/opencv.hpp>
-#include <math.h>
 
+constexpr float SCAN_DISTANCE = 0.7071;
 
 rst::pos_buf_id rst::rasterizer::load_positions(const std::vector<Eigen::Vector3f> &positions)
 {
@@ -39,13 +39,59 @@ auto to_vec4(const Eigen::Vector3f& v3, float w = 1.0f)
     return Vector4f(v3.x(), v3.y(), v3.z(), w);
 }
 
-
-static bool insideTriangle(int x, int y, const Vector3f* _v)
+static bool MSAA_insideTriangle(float x, float y, const Vector3f* _v)
 {
     Eigen::Vector3f p = Vector3f(x, y, 0);
+
     return (_v[1] - _v[0]).cross(p - _v[0]).z() > 0 &&
            (_v[2] - _v[1]).cross(p - _v[1]).z() > 0 &&
            (_v[0] - _v[2]).cross(p - _v[2]).z() > 0;
+}
+
+static float insideTriangle(int x, int y, const Vector3f* _v)
+{
+    Eigen::Vector3f p = Vector3f(x, y, 0);
+
+    Eigen::Vector3f edges[3] = {
+            _v[1] - _v[0],
+            _v[2] - _v[1],
+            _v[0] - _v[2]
+    };
+
+    Eigen::Vector3f v[3] = {
+            p - _v[0],
+            p - _v[1],
+            p - _v[2]
+    };
+
+
+    bool flag = false;
+    for (int i = 0; i < 3; i++) {
+        Eigen::Vector3f e = edges[i] / edges[i].norm();
+        v[i].z() = 0;
+
+        float length = ((e.dot(v[i]) * e) - v[i]).norm();
+        if (length < SCAN_DISTANCE) {
+            flag = true;
+            break;
+        }
+    }
+    if (flag) {
+        float alpha = 0;
+
+        if (MSAA_insideTriangle(x - 0.25f, y - 0.25f, _v)) alpha += 0.25;
+        if (MSAA_insideTriangle(x - 0.25f, y + 0.25f, _v)) alpha += 0.25;
+        if (MSAA_insideTriangle(x + 0.25f, y + 0.25f, _v)) alpha += 0.25;
+        if (MSAA_insideTriangle(x + 0.25f, y - 0.25f, _v)) alpha += 0.25;
+
+        return alpha;
+    } else if ((edges[0]).cross(v[0]).z() > 0 &&
+               (edges[1]).cross(v[1]).z() > 0 &&
+               (edges[2]).cross(v[2]).z() > 0) {
+        return 1;
+    }
+
+    return 0;
 }
 
 static std::tuple<float, float, float> computeBarycentric2D(float x, float y, const Vector3f* v)
@@ -125,8 +171,10 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
 
     for (int x = box_min[0]; x <= box_max[0]; x++) {
         for (int y = box_min[1]; y <= box_max[1]; y++) {
+            float a = insideTriangle(x, y, t.v);
+
             // 判断是否在三角形内
-            if (!insideTriangle(x, y, t.v)) continue;
+            if (a == 0) continue;
 
             int index = get_index(x, y);
 
@@ -139,7 +187,7 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
             // 深度测试
             if (z_interpolated < depth_buf[index]) {
                 depth_buf[index] = z_interpolated;
-                frame_buf[index] = t.getColor();
+                frame_buf[index] = t.getColor() * a;
             }
         }
     }
