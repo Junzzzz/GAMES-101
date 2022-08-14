@@ -49,8 +49,33 @@ Eigen::Matrix4f get_model_matrix(float angle)
 
 Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio, float zNear, float zFar)
 {
-    // TODO: Use the same projection matrix from the previous assignments
+    // 复制自上一个作业
+    float n, f, width, height;
+    n = -zNear;
+    f = -zFar;
 
+    height = std::abs(n) * std::tan(eye_fov / 180 / 2 * MY_PI) * 2;
+    width = height * aspect_ratio;
+
+    Eigen::Matrix4f projection, ortho_translate, ortho_scale, persp2ortho;
+
+    ortho_translate << 1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, -(n + f) / 2,
+            0, 0, 0, 1;
+
+    ortho_scale << 2 / width, 0, 0, 0,
+            0, 2 / height, 0, 0,
+            0, 0, 2 / (n - f), 0,
+            0, 0, 0, 1;
+
+    persp2ortho << n, 0, 0, 0,
+            0, n, 0, 0,
+            0, 0, n + f, -n * f,
+            0, 0, 1, 0;
+
+    projection = ortho_scale * ortho_translate * persp2ortho;
+    return projection;
 }
 
 Eigen::Vector3f vertex_shader(const vertex_shader_payload& payload)
@@ -137,12 +162,31 @@ Eigen::Vector3f phong_fragment_shader(const fragment_shader_payload& payload)
     Eigen::Vector3f point = payload.view_pos;
     Eigen::Vector3f normal = payload.normal;
 
+    // 视线方向（朝眼睛方向）
+    Eigen::Vector3f v = (eye_pos - point).normalized();
+
     Eigen::Vector3f result_color = {0, 0, 0};
-    for (auto& light : lights)
-    {
-        // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
-        // components are. Then, accumulate that result on the *result_color* object.
-        
+    for (auto &light: lights) {
+        // 入射光线（朝光源方向）
+        Eigen::Vector3f l = light.position - point;
+
+        // 距离平方
+        float distance2 = l.squaredNorm();
+
+        // 先计算距离再转为单位向量
+        l.normalize();
+
+        // 半程向量
+        Eigen::Vector3f h = (v + l).normalized();
+
+        // 减少重复计算用的中间值
+        Eigen::Vector3f i = light.intensity * (1 / distance2);
+
+        Eigen::Vector3f ambient = amb_light_intensity.cwiseProduct(ka);
+        Eigen::Vector3f diffuse = i.cwiseProduct(kd) * std::max(0.0f, normal.dot(l));
+        Eigen::Vector3f specular = i.cwiseProduct(ks) * std::pow(std::max(0.0f, normal.dot(h)), p);
+
+        result_color += (ambient + diffuse + specular);
     }
 
     return result_color * 255.f;

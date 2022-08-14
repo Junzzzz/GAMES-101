@@ -300,10 +300,15 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
             if (zp >= depth_buf[index]) continue;
             depth_buf[index] = zp;
 
-            auto interpolated_color = interpolate(alpha, beta, gamma, t.color[0], t.color[1], t.color[2], 1);
-            auto interpolated_normal = interpolate(alpha, beta, gamma, t.normal[0], t.normal[1], t.normal[2], 1);
-            auto interpolated_texcoords = interpolate(alpha, beta, gamma, t.tex_coords[0], t.tex_coords[1], t.tex_coords[2], 1);
-            auto interpolated_shadingcoords = interpolate(alpha, beta, gamma, view_pos[0], view_pos[1], view_pos[2], 1);
+            // 观察空间坐标点插值（事实上可以不进行矫正，误差不大）
+            float v_alpha = alpha / v[0].w() * Z;
+            float v_beta = beta / v[1].w() * Z;
+            float v_gamma = gamma / v[2].w() * Z;
+
+            auto interpolated_color = interpolate(v_alpha, v_beta, v_gamma, t.color[0], t.color[1], t.color[2], 1);
+            auto interpolated_normal = interpolate(v_alpha, v_beta, v_gamma, t.normal[0], t.normal[1], t.normal[2], 1);
+            auto interpolated_texcoords = interpolate(v_alpha, v_beta, v_gamma, t.tex_coords[0], t.tex_coords[1], t.tex_coords[2], 1);
+            auto interpolated_shadingcoords = interpolate(v_alpha, v_beta, v_gamma, view_pos[0], view_pos[1], view_pos[2], 1);
 
             fragment_shader_payload payload( interpolated_color, interpolated_normal.normalized(), interpolated_texcoords, texture ? &*texture : nullptr);
             payload.view_pos = interpolated_shadingcoords;
