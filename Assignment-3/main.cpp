@@ -231,27 +231,57 @@ Eigen::Vector3f displacement_fragment_shader(const fragment_shader_payload& payl
     Eigen::Vector3f normal = payload.normal;
 
     float kh = 0.2, kn = 0.1;
-    
-    // TODO: Implement displacement mapping here
-    // Let n = normal = (x, y, z)
-    // Vector t = (x*y/sqrt(x*x+z*z),sqrt(x*x+z*z),z*y/sqrt(x*x+z*z))
-    // Vector b = n cross product t
-    // Matrix TBN = [t b n]
-    // dU = kh * kn * (h(u+1/w,v)-h(u,v))
-    // dV = kh * kn * (h(u,v+1/h)-h(u,v))
-    // Vector ln = (-dU, -dV, 1)
-    // Position p = p + kn * n * h(u,v)
-    // Normal n = normalize(TBN * ln)
 
+    float x = normal.x(), y = normal.y(), z = normal.z();
+    float sq_xz = sqrt(x * x + z * z);
+    Eigen::Vector3f t(x * y / sq_xz, sq_xz, z * y / sq_xz);
+    Eigen::Vector3f b = normal.cross(t);
+    Eigen::Matrix3f TBN;
+
+    TBN.col(0) = t;
+    TBN.col(1) = b;
+    TBN.col(2) = normal;
+
+    // FAQ: https://games-cn.org/forums/topic/frequently-asked-questionskeep-updating/
+    int h = payload.texture->height, w = payload.texture->width;
+    float u = payload.tex_coords.x();
+    float v = payload.tex_coords.y();
+
+    // 抽出重复计算部分
+    float h_uv = payload.texture->getColor(u, v).norm();
+
+    float dU = kh * kn * (payload.texture->getColor(u + 1.0f / w, v).norm() - h_uv);
+    float dV = kh * kn * (payload.texture->getColor(u, v + 1.0f / h).norm() - h_uv);
+    Eigen::Vector3f ln(-dU, -dV, 1);
+    normal = (TBN * ln).normalized();
+
+    point = point + (kn * normal * h_uv);
+
+    // 视线方向（朝眼睛方向）
+    Eigen::Vector3f v_dir = (eye_pos - point).normalized();
 
     Eigen::Vector3f result_color = {0, 0, 0};
+    for (auto &light: lights) {
+        // 入射光线（朝光源方向）
+        Eigen::Vector3f l_dir = light.position - point;
 
-    for (auto& light : lights)
-    {
-        // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
-        // components are. Then, accumulate that result on the *result_color* object.
+        // 距离平方
+        float distance2 = l_dir.squaredNorm();
 
+        // 先计算距离再转为单位向量
+        l_dir.normalize();
 
+        // 半程向量
+        Eigen::Vector3f h_dir = (v_dir + l_dir).normalized();
+
+        // 减少重复计算用的中间值
+        Eigen::Vector3f i = light.intensity * (1 / distance2);
+
+        Eigen::Vector3f ambient = amb_light_intensity.cwiseProduct(ka);
+        Eigen::Vector3f diffuse = i.cwiseProduct(kd) * std::max(0.0f, normal.dot(l_dir));
+        Eigen::Vector3f specular = i.cwiseProduct(ks) * std::pow(std::max(0.0f, normal.dot(h_dir)), p);
+
+        result_color += (ambient + diffuse + specular);
     }
 
     return result_color * 255.f;
@@ -374,7 +404,7 @@ int main(int argc, const char** argv)
         }
         else if (argc == 3 && std::string(argv[2]) == "displacement")
         {
-            std::cout << "Rasterizing using the bump shader\n";
+            std::cout << "Rasterizing using the displacement shader\n";
             active_shader = displacement_fragment_shader;
         }
     }
