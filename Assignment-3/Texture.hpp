@@ -24,6 +24,9 @@ public:
 
     Eigen::Vector3f getColor(float u, float v)
     {
+        // 会出现 u/v 值溢出的情况
+        u = std::clamp(u, 0.0f, 1.0f);
+        v = std::clamp(v, 0.0f, 1.0f);
         auto u_img = u * width;
         auto v_img = (1 - v) * height;
         auto color = image_data.at<cv::Vec3b>(v_img, u_img);
