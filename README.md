@@ -50,6 +50,12 @@
 
 ![displacement](./images/displacement.png)
 
+## 任务4
+
+![bezier-curve](./images/bezier-curve.png)
+
+做了贝塞尔曲线的抗锯齿，上下两条是对比
+
 ---
 
 待续
